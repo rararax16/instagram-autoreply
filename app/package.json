@@ -1,0 +1,23 @@
+{
+  "name": "app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "start": "nuxt start",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "postinstall": "prisma generate && nuxt prepare"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.2",
+    "nuxt": "^3.21.1",
+    "prisma": "^6.16.2",
+    "vue": "^3.5.27",
+    "vue-router": "^4.6.4"
+  }
+}

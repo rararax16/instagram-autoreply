@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventChannel {
+  DM
+  COMMENT
+}
+
+enum ReplyStatus {
+  STUBBED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Tenant {
+  id              String          @id @default(cuid())
+  name            String
+  users           User[]
+  igAccounts      IgAccount[]
+  replyRules      ReplyRule[]
+  inboundEvents   InboundEvent[]
+  outboundReplies OutboundReply[]
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model IgAccount {
+  id                   String   @id @default(cuid())
+  tenantId             String   @map("tenant_id")
+  platformUserId       String   @map("platform_user_id")
+  username             String
+  accessTokenEncrypted String   @map("access_token_encrypted")
+  enabled              Boolean  @default(true)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, platformUserId])
+  @@index([tenantId])
+  @@map("ig_accounts")
+}
+
+model ReplyRule {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  channel   EventChannel
+  keyword   String
+  replyText String       @map("reply_text") @db.Text
+  priority  Int          @default(100)
+  isActive  Boolean      @default(true) @map("is_active")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, channel, isActive, priority])
+  @@map("reply_rules")
+}
+
+model InboundEvent {
+  id              String         @id @default(cuid())
+  tenantId        String         @map("tenant_id")
+  channel         EventChannel
+  externalEventId String         @map("external_event_id")
+  senderId        String         @map("sender_id")
+  content         String         @db.Text
+  matchedRuleId   String?        @map("matched_rule_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  outboundReplies OutboundReply[]
+
+  @@unique([tenantId, externalEventId])
+  @@index([tenantId, channel, createdAt])
+  @@map("inbound_events")
+}
+
+model OutboundReply {
+  id           String       @id @default(cuid())
+  tenantId     String       @map("tenant_id")
+  inboundEventId String?    @map("inbound_event_id")
+  replyText    String       @map("reply_text") @db.Text
+  status       ReplyStatus  @default(STUBBED)
+  errorMessage String?      @map("error_message") @db.Text
+  createdAt    DateTime     @default(now()) @map("created_at")
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inboundEvent InboundEvent? @relation(fields: [inboundEventId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, createdAt])
+  @@map("outbound_replies")
+}
