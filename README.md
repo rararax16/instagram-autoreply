@@ -49,6 +49,8 @@ Nuxt 3（フロント + server routes）と MySQL を `docker-compose` で動か
 - `META_WEBHOOK_VERIFY_TOKEN`
 - `APP_BASE_URL`
 
+`META_APP_ID` / `META_APP_SECRET` は、この実装では **Instagram Login 対応のMetaアプリ（Instagramアプリ）** の値を設定してください。
+
 ### 2. 起動
 
 ```bash
@@ -105,17 +107,15 @@ npx prisma migrate deploy
 
 ### Meta App 側で必要な設定
 
+- `META_APP_ID` / `META_APP_SECRET` は Instagram Login 対応の Meta アプリ値を使用する
+
 - OAuth リダイレクトURI:
   - `http://localhost:3000/api/ig-accounts/oauth/callback`
   - 本番は `APP_BASE_URL` に合わせたURL
 - 必要権限（例）:
-  - `instagram_basic`
-  - `instagram_manage_messages`
-  - `instagram_manage_comments`
-  - `pages_show_list`
-  - `pages_read_engagement`
-  - `pages_manage_metadata`
-  - `business_management`
+  - `instagram_business_basic`
+  - `instagram_business_manage_messages`
+  - `instagram_business_manage_comments`
 
 ## 主要エンドポイント
 
@@ -147,3 +147,23 @@ npx prisma migrate deploy
 - プロトタイプのため、返信送信は現在スタブ実装です。
 - `app/.env` はGit管理しないでください。
 - 本番では DB資格情報・秘密鍵を必ず変更してください。
+
+
+# 開発を行う場合の設定
+
+test@example.com
+password123
+
+## MetaApp設定箇所
+- アプリ設定 > ベーシック > アプリドメイン > ドメインを追加 > {ドメイン}
+- 認証トークン > META_WEBHOOK_VERIFY_TOKEN
+- Instagram > 2. Webhooksを設定する > 
+  - コールバックURL > {ドメイン}/api/webhooks/instagram
+  - 認証トークン > META_WEBHOOK_VERIFY_TOKEN
+- Instagram > InstagramビジネスログインによるAPI設定 > ビジネスログイン設定 > {ドメイン}api/ig-accounts/oauth/callback
+- APP_BASE_URL > {ドメイン}
+
+https://4a0e-1-21-49-250.ngrok-free.app/api/webhooks/instagram
+https://4a0e-1-21-49-250.ngrok-free.app/api/ig-accounts/oauth/callback
+
+docker compose -f docker-compose.dev.yml up -d

@@ -58,10 +58,11 @@ export default defineEventHandler(async (event) => {
 
   try {
     const token = await exchangeCodeForUserToken(code)
-    const accounts = await fetchInstagramOAuthAccounts(token.access_token)
+    const tokenUserId = typeof token.user_id === 'undefined' ? undefined : String(token.user_id)
+    const accounts = await fetchInstagramOAuthAccounts(token.access_token, tokenUserId)
 
     if (accounts.length === 0) {
-      return redirectWithError(event, 'Instagramビジネスアカウントが見つかりませんでした')
+      return redirectWithError(event, 'Instagramアカウントが見つかりませんでした')
     }
 
     await prisma.$transaction(async (tx) => {
@@ -92,7 +93,7 @@ export default defineEventHandler(async (event) => {
     return sendRedirect(event, `/dashboard?ig_connected=${accounts.length}`)
   }
   catch (error: any) {
-    const message = error?.statusMessage || 'Instagram連携処理に失敗しました'
+    const message = error?.statusMessage || error?.message || 'Instagram連携処理に失敗しました'
     return redirectWithError(event, message)
   }
 })

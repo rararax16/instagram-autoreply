@@ -15,6 +15,8 @@ type InboundEvent = {
   id: string
   channel: EventChannel
   senderId: string
+  senderUsername: string | null
+  isSelfEvent: boolean
   content: string
   createdAt: string
   outboundReplies: Array<{
@@ -46,6 +48,8 @@ if (!meData.value?.authenticated) {
   await navigateTo('/login')
 }
 
+const isAdmin = computed(() => meData.value?.user?.role === 'ADMIN')
+
 const { data: rulesData, refresh: refreshRules } = await useFetch('/api/reply-rules')
 const { data: eventsData, refresh: refreshEvents } = await useFetch('/api/inbound-events')
 const { data: accountsData, refresh: refreshAccounts } = await useFetch('/api/ig-accounts')
@@ -66,6 +70,7 @@ const ruleForm = reactive({
 const inboundForm = reactive({
   channel: 'DM' as EventChannel,
   senderId: '',
+  senderUsername: '',
   content: ''
 })
 
@@ -237,6 +242,7 @@ async function simulateInboundEvent() {
     })
     setNotice('受信イベントを保存し、自動返信処理を実行しました')
     inboundForm.senderId = ''
+    inboundForm.senderUsername = ''
     inboundForm.content = ''
     await refreshEvents()
   }
@@ -248,6 +254,10 @@ async function simulateInboundEvent() {
 function formatDate(value: string) {
   return new Date(value).toLocaleString('ja-JP')
 }
+
+function getInstagramProfileUrl(senderUsername: string) {
+  return `https://www.instagram.com/${encodeURIComponent(senderUsername.trim())}/`
+}
 </script>
 
 <template>
@@ -255,9 +265,12 @@ function formatDate(value: string) {
     <header class="top-header">
       <div>
         <h1>Instagram DM/コメント 自動返信</h1>
-        <p>ログイン中: {{ meData?.user?.email }}</p>
+        <p>ログイン中: {{ meData?.user?.email }}（{{ isAdmin ? 'システム管理者' : '一般' }}）</p>
       </div>
-      <button class="logout" @click="logout">ログアウト</button>
+      <div class="top-actions">
+        <NuxtLink v-if="isAdmin" class="secondary nav-link" to="/users">ユーザーマスター</NuxtLink>
+        <button class="logout" @click="logout">ログアウト</button>
+      </div>
     </header>
 
     <p v-if="notice" class="notice">{{ notice }}</p>
@@ -389,6 +402,10 @@ function formatDate(value: string) {
         </label>
       </div>
       <label>
+        送信者ユーザー名（任意）
+        <input v-model="inboundForm.senderUsername" type="text" placeholder="instagram_user" />
+      </label>
+      <label>
         受信本文
         <textarea v-model="inboundForm.content" rows="3" placeholder="資料をください"></textarea>
       </label>
@@ -398,7 +415,7 @@ function formatDate(value: string) {
     <section class="card">
       <div class="section-head">
         <h2>受信イベントログ</h2>
-        <button class="secondary" @click="refreshEvents">再読み込み</button>
+        <button class="secondary" @click="() => refreshEvents()">再読み込み</button>
       </div>
       <div class="table-wrap">
         <table>
@@ -415,7 +432,22 @@ function formatDate(value: string) {
             <tr v-for="event in events" :key="event.id">
               <td>{{ formatDate(event.createdAt) }}</td>
               <td>{{ event.channel }}</td>
-              <td>{{ event.senderId }}</td>
+              <td>
+                <div class="sender-cell">
+                  <a
+                    v-if="event.senderUsername"
+                    class="sender-link"
+                    :href="getInstagramProfileUrl(event.senderUsername)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    @{{ event.senderUsername }}
+                  </a>
+                  <span v-else class="sender-name sender-name-muted">ユーザー名未取得</span>
+                  <span class="sender-id">ID: {{ event.senderId }}</span>
+                  <span v-if="event.isSelfEvent" class="self-badge">自分</span>
+                </div>
+              </td>
               <td>{{ event.content }}</td>
               <td>
                 <span v-if="event.outboundReplies[0]">
@@ -449,6 +481,12 @@ function formatDate(value: string) {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.top-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 h1 {
@@ -558,6 +596,11 @@ textarea {
   color: #1f3f4f;
 }
 
+.nav-link {
+  text-decoration: none;
+  display: inline-block;
+}
+
 .logout {
   background: #3c6273;
   color: #fff;
@@ -566,6 +609,46 @@ textarea {
 .row-actions {
   display: flex;
   gap: 6px;
+}
+
+.sender-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sender-link {
+  color: #0b5b9d;
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+.sender-link:hover {
+  text-decoration: none;
+}
+
+.sender-name {
+  color: #446273;
+  font-size: 13px;
+}
+
+.sender-name-muted {
+  color: #6f8794;
+}
+
+.sender-id {
+  color: #527182;
+  font-size: 12px;
+}
+
+.self-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: #d9f3e8;
+  color: #1b6f4f;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .mini {

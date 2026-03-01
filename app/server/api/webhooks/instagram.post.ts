@@ -2,6 +2,8 @@ import { EventChannel } from '@prisma/client'
 import { randomUUID } from 'node:crypto'
 import { processInboundEvent } from '../../utils/auto-reply'
 import { prisma } from '../../utils/prisma'
+import { fetchInstagramSenderUsername } from '../../services/instagram.service'
+import { hasInboundSenderUsernameField } from '../../utils/prisma-features'
 import { verifyWebhookSignature } from '../../utils/webhook'
 
 type ParsedEvent = {
@@ -9,6 +11,7 @@ type ParsedEvent = {
   platformUserId?: string
   channel: EventChannel
   senderId: string
+  senderUsername?: string
   content: string
   externalEventId: string
 }
@@ -25,6 +28,7 @@ function parseWebhookPayload(payload: any): ParsedEvent[] {
       if (!event || typeof event !== 'object') {
         continue
       }
+      console.log('📝：', event)
 
       const channel = typeof event.channel === 'string' && event.channel.toUpperCase() === 'COMMENT'
         ? EventChannel.COMMENT
@@ -35,6 +39,7 @@ function parseWebhookPayload(payload: any): ParsedEvent[] {
         platformUserId: typeof event.platformUserId === 'string' ? event.platformUserId : undefined,
         channel,
         senderId: typeof event.senderId === 'string' ? event.senderId : 'unknown',
+        senderUsername: typeof event.senderUsername === 'string' ? event.senderUsername : undefined,
         content: typeof event.content === 'string' ? event.content : '',
         externalEventId: typeof event.externalEventId === 'string' ? event.externalEventId : randomUUID()
       })
@@ -56,6 +61,7 @@ function parseWebhookPayload(payload: any): ParsedEvent[] {
             platformUserId: entryId,
             channel: EventChannel.DM,
             senderId: messageEvent?.sender?.id || 'unknown',
+            senderUsername: messageEvent?.sender?.username,
             content: text,
             externalEventId: messageEvent?.message?.mid || randomUUID()
           })
@@ -75,6 +81,7 @@ function parseWebhookPayload(payload: any): ParsedEvent[] {
             platformUserId: entryId,
             channel: EventChannel.COMMENT,
             senderId: value?.from?.id || 'unknown',
+            senderUsername: value?.from?.username,
             content: text,
             externalEventId: value?.id || randomUUID()
           })
@@ -108,6 +115,8 @@ async function resolveTenantId(event: ParsedEvent): Promise<string | null> {
 }
 
 export default defineEventHandler(async (event) => {
+  console.log('🐶🐶🐶Instagram Webhook Event Received POST')
+  const canStoreSenderUsername = hasInboundSenderUsernameField()
   const config = useRuntimeConfig()
   const appSecret = config.metaAppSecret || process.env.META_APP_SECRET || ''
 
@@ -128,10 +137,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Webhook署名の検証に失敗しました' })
   }
 
+  console.log('GOGO::', rawBody)
+
   const payload = JSON.parse(rawBody)
   const parsedEvents = parseWebhookPayload(payload)
 
   let processedCount = 0
+
+  console.log('😺Parsed Webhook Events:', parsedEvents)
 
   for (const parsedEvent of parsedEvents) {
     if (!parsedEvent.content.trim()) {
@@ -141,6 +154,15 @@ export default defineEventHandler(async (event) => {
     const tenantId = await resolveTenantId(parsedEvent)
     if (!tenantId) {
       continue
+    }
+
+    let senderUsername = parsedEvent.senderUsername?.trim() || null
+    if (!senderUsername) {
+      senderUsername = await fetchInstagramSenderUsername({
+        tenantId,
+        senderId: parsedEvent.senderId,
+        platformUserId: parsedEvent.platformUserId
+      })
     }
 
     const exists = await prisma.inboundEvent.findUnique({
@@ -159,14 +181,20 @@ export default defineEventHandler(async (event) => {
       continue
     }
 
+    const inboundEventData: Record<string, unknown> = {
+      tenantId,
+      channel: parsedEvent.channel,
+      externalEventId: parsedEvent.externalEventId,
+      senderId: parsedEvent.senderId,
+      content: parsedEvent.content
+    }
+
+    if (canStoreSenderUsername) {
+      inboundEventData.senderUsername = senderUsername
+    }
+
     const inboundEvent = await prisma.inboundEvent.create({
-      data: {
-        tenantId,
-        channel: parsedEvent.channel,
-        externalEventId: parsedEvent.externalEventId,
-        senderId: parsedEvent.senderId,
-        content: parsedEvent.content
-      }
+      data: inboundEventData as any
     })
 
     await processInboundEvent({

@@ -1,7 +1,4 @@
 <script setup lang="ts">
-const mode = ref<'login' | 'register'>('login')
-
-const tenantName = ref('')
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
@@ -18,25 +15,13 @@ async function submit() {
   errorMessage.value = ''
 
   try {
-    if (mode.value === 'register') {
-      await $fetch('/api/auth/register', {
-        method: 'POST',
-        body: {
-          tenantName: tenantName.value,
-          email: email.value,
-          password: password.value
-        }
-      })
-    }
-    else {
-      await $fetch('/api/auth/login', {
-        method: 'POST',
-        body: {
-          email: email.value,
-          password: password.value
-        }
-      })
-    }
+    await $fetch('/api/auth/login', {
+      method: 'POST',
+      body: {
+        email: email.value,
+        password: password.value
+      }
+    })
 
     await navigateTo('/dashboard')
   }
@@ -54,18 +39,9 @@ async function submit() {
     <section class="auth-card">
       <h1>Instagram 自動返信プロトタイプ</h1>
       <p class="lead">日本語UIでDM/コメント自動返信ルールを管理できます。</p>
-
-      <div class="mode-buttons">
-        <button :class="{ active: mode === 'login' }" @click="mode = 'login'">ログイン</button>
-        <button :class="{ active: mode === 'register' }" @click="mode = 'register'">新規登録</button>
-      </div>
+      <p class="notice">ユーザーの新規作成は管理者ユーザーのみ実行できます。</p>
 
       <form class="auth-form" @submit.prevent="submit">
-        <label v-if="mode === 'register'">
-          テナント名
-          <input v-model="tenantName" type="text" placeholder="例: 株式会社サンプル" />
-        </label>
-
         <label>
           メールアドレス
           <input v-model="email" type="email" placeholder="you@example.com" required />
@@ -79,9 +55,15 @@ async function submit() {
         <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
         <button class="submit" :disabled="loading">
-          {{ loading ? '送信中...' : mode === 'login' ? 'ログイン' : '登録する' }}
+          {{ loading ? '送信中...' : 'ログイン' }}
         </button>
       </form>
+
+      <p class="policy-links">
+        <NuxtLink to="/privacy">プライバシーポリシー</NuxtLink>
+        <span>・</span>
+        <NuxtLink to="/terms">利用規約</NuxtLink>
+      </p>
     </section>
   </main>
 </template>
@@ -116,26 +98,13 @@ h1 {
   color: #395261;
 }
 
-.mode-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.mode-buttons button {
-  border: none;
+.notice {
+  margin: 0 0 16px;
+  padding: 10px 12px;
   border-radius: 10px;
-  padding: 10px;
-  background: #d7e9ef;
-  color: #1f3b4a;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.mode-buttons button.active {
-  background: #158465;
-  color: #ffffff;
+  background: #e9f4fb;
+  color: #254a63;
+  font-size: 13px;
 }
 
 .auth-form {
@@ -177,5 +146,22 @@ input {
 .submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.policy-links {
+  margin: 16px 0 0;
+  text-align: center;
+  color: #526b78;
+  font-size: 13px;
+}
+
+.policy-links a {
+  color: #0f6a51;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.policy-links a:hover {
+  text-decoration: underline;
 }
 </style>

@@ -44,9 +44,12 @@ export async function processInboundEvent(input: ProcessInboundEventInput) {
     })
   }
 
-  await prisma.inboundEvent.update({
+  const inboundEvent = await prisma.inboundEvent.update({
     where: { id: input.inboundEventId },
-    data: { matchedRuleId: matchedRule.id }
+    data: { matchedRuleId: matchedRule.id },
+    select: {
+      externalEventId: true
+    }
   })
 
   const account = await prisma.igAccount.findFirst({
@@ -72,18 +75,24 @@ export async function processInboundEvent(input: ProcessInboundEventInput) {
   }
 
   const sendResult = await sendInstagramReply({
+    tenantId: input.tenantId,
     platformUserId: account.platformUserId,
     recipientId: input.senderId,
     text: matchedRule.replyText,
-    channel: input.channel
+    channel: input.channel,
+    commentId: input.channel === EventChannel.COMMENT ? inboundEvent.externalEventId : undefined
   })
+
+  const replyStatus = sendResult.status === 'SENT'
+    ? ReplyStatus.SENT
+    : ReplyStatus.FAILED
 
   return prisma.outboundReply.create({
     data: {
       tenantId: input.tenantId,
       inboundEventId: input.inboundEventId,
       replyText: matchedRule.replyText,
-      status: sendResult.success ? ReplyStatus.STUBBED : ReplyStatus.FAILED,
+      status: replyStatus,
       errorMessage: sendResult.success ? null : (sendResult.message || '返信送信に失敗しました')
     }
   })

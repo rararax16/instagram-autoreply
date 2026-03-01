@@ -19,6 +19,11 @@ enum ReplyStatus {
   SKIPPED
 }
 
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
 model Tenant {
   id              String          @id @default(cuid())
   name            String
@@ -38,6 +43,7 @@ model User {
   tenantId     String   @map("tenant_id")
   email        String   @unique
   passwordHash String   @map("password_hash")
+  role         UserRole @default(MEMBER)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -84,6 +90,7 @@ model InboundEvent {
   channel         EventChannel
   externalEventId String         @map("external_event_id")
   senderId        String         @map("sender_id")
+  senderUsername  String?        @map("sender_username")
   content         String         @db.Text
   matchedRuleId   String?        @map("matched_rule_id")
   createdAt       DateTime       @default(now()) @map("created_at")

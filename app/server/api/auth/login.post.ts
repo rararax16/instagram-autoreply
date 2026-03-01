@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
       id: true,
       tenantId: true,
       email: true,
+      role: true,
       passwordHash: true
     }
   })
@@ -41,7 +42,8 @@ export default defineEventHandler(async (event) => {
     user: {
       id: user.id,
       tenantId: user.tenantId,
-      email: user.email
+      email: user.email,
+      role: user.role
     }
   }
 })

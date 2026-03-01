@@ -2,10 +2,13 @@ import type { H3Event } from 'h3'
 import { prisma } from './prisma'
 import { getSessionFromEvent } from './session'
 
+type UserRole = 'ADMIN' | 'MEMBER'
+
 export type AuthUser = {
   id: string
   tenantId: string
   email: string
+  role: UserRole
 }
 
 export async function getAuthUser(event: H3Event): Promise<AuthUser | null> {
@@ -20,7 +23,8 @@ export async function getAuthUser(event: H3Event): Promise<AuthUser | null> {
     select: {
       id: true,
       tenantId: true,
-      email: true
+      email: true,
+      role: true
     }
   })
 
@@ -38,6 +42,19 @@ export async function requireAuth(event: H3Event): Promise<AuthUser> {
     throw createError({
       statusCode: 401,
       statusMessage: 'ログインが必要です'
+    })
+  }
+
+  return user
+}
+
+export async function requireAdmin(event: H3Event): Promise<AuthUser> {
+  const user = await requireAuth(event)
+
+  if (user.role !== 'ADMIN') {
+    throw createError({
+      statusCode: 403,
+      message: '管理者権限が必要です'
     })
   }
 
